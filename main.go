@@ -15,6 +15,10 @@ var (
 func main() {
 	parser := argparse.NewParser("mygo", "Simple utility for daily tasks")
 	gsCmd := parser.NewCommand("gs", "Simplified git status")
+	knownFile := gsCmd.String("k", "known-files", &argparse.Options{
+		Required: false,
+		Help:     "List of known files that will be excluded on list",
+	})
 	gpCmd := parser.NewCommand("gp", "Git push current branch")
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -22,7 +26,7 @@ func main() {
 		return
 	}
 	if gsCmd.Happened() {
-		gs()
+		gs(*knownFile)
 	} else if gpCmd.Happened() {
 		gp()
 	} else {
@@ -35,8 +39,8 @@ func gp() {
 	handleErr(err)
 }
 
-func gs() {
-	err := g.PrintStatus()
+func gs(knownPath string) {
+	err := g.PrintStatus(knownPath)
 	handleErr(err)
 }
 

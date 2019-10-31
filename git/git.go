@@ -2,6 +2,8 @@ package git
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -28,12 +30,16 @@ func (git *Git) Repo() (string, error) {
 	return cmd("git remote get-url origin")
 }
 
-func (git *Git) PrintStatus() error {
+func (git *Git) PrintStatus(knownPath string) error {
+	knownList, err := readKnownList(knownPath)
+	if err != nil {
+		return err
+	}
 	branch, err := git.Branch()
 	if err != nil {
 		return err
 	}
-	sm, err := git.Status()
+	sm, err := git.Status(knownList)
 	if err != nil {
 		return err
 	}
@@ -47,7 +53,7 @@ func (git *Git) PrintStatus() error {
 	return nil
 }
 
-func (git *Git) Status() (map[string][]string, error) {
+func (git *Git) Status(knownList []string) (map[string][]string, error) {
 	out, err := cmd("git status -s")
 	if err != nil {
 		return nil, err
@@ -59,6 +65,9 @@ func (git *Git) Status() (map[string][]string, error) {
 			continue
 		}
 		key, file := extractStatus(line)
+		if stringInSlice(file, knownList) {
+			continue
+		}
 		arr, ok := statusMap[key]
 		if ok {
 			statusMap[key] = append(arr, file)
@@ -98,4 +107,32 @@ func extractStatus(line string) (string, string) {
 		key = "Not git-added"
 	}
 	return key, f
+}
+
+func fileExists(filepath string) bool {
+	_, err := os.Stat(filepath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func readKnownList(knownPath string) ([]string, error) {
+	if fileExists(knownPath) {
+		f, err := ioutil.ReadFile(knownPath)
+		if err != nil {
+			return nil, err
+		}
+		return strings.Split(string(f), "\n"), nil
+	}
+	return []string{}, nil
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
