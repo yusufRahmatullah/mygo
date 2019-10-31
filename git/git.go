@@ -19,6 +19,11 @@ func (git *Git) Branch() (string, error) {
 	return cmd("git rev-parse --abbrev-ref HEAD")
 }
 
+func (git *Git) Push() error {
+	_, err := cmd("git push origin HEAD")
+	return err
+}
+
 func (git *Git) Repo() (string, error) {
 	return cmd("git remote get-url origin")
 }

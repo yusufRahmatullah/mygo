@@ -8,23 +8,34 @@ import (
 	"github.com/yusufRahmatullah/mygo/git"
 )
 
+var (
+	g = &git.Git{}
+)
+
 func main() {
 	parser := argparse.NewParser("mygo", "Simple utility for daily tasks")
-	gitCmd := parser.NewCommand("gd", "Advance git diff")
+	gsCmd := parser.NewCommand("gs", "Simplified git status")
+	gpCmd := parser.NewCommand("gp", "Git push current branch")
 	err := parser.Parse(os.Args)
 	if err != nil {
 		print(parser.Usage(err))
 		return
 	}
-	if gitCmd.Happened() {
-		gd()
+	if gsCmd.Happened() {
+		gs()
+	} else if gpCmd.Happened() {
+		gp()
 	} else {
 		print("Something went wrong")
 	}
 }
 
-func gd() {
-	g := &git.Git{}
+func gp() {
+	err := g.Push()
+	handleErr(err)
+}
+
+func gs() {
 	err := g.PrintStatus()
 	handleErr(err)
 }
