@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+const (
+	GitAdded  = "Git-added"
+	NotGit    = "Not git-added"
+	Untracked = "Untracked"
+)
+
 type Git struct {
 }
 
@@ -26,14 +32,13 @@ func (git *Git) PrintStatus() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("On Branch", branch)
-	for k, v := range sm {
-		fmt.Println(k)
-		for _, f := range v {
-			fmt.Println("\t", f)
+	ctn := []string{fmt.Sprintf("On Branch %v", branch)}
+	for _, key := range []string{NotGit, GitAdded, Untracked} {
+		if v, ok := sm[key]; ok {
+			ctn = append(ctn, extendStatus(key, v)...)
 		}
-		fmt.Println("")
 	}
+	fmt.Println(strings.Join(ctn, "\n"))
 	return nil
 }
 
@@ -48,13 +53,12 @@ func (git *Git) Status() (map[string][]string, error) {
 		if line == "" {
 			continue
 		}
-		d := strings.Split(line, " ")
-		key := d[0]
+		key, file := extractStatus(line)
 		arr, ok := statusMap[key]
 		if ok {
-			arr = append(arr, d[1])
+			statusMap[key] = append(arr, file)
 		} else {
-			statusMap[key] = []string{d[1]}
+			statusMap[key] = []string{file}
 		}
 	}
 	return statusMap, nil
@@ -69,4 +73,24 @@ func cmd(command string) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+func extendStatus(key string, value []string) []string {
+	ctn := []string{fmt.Sprintf("%v:", key)}
+	for _, v := range value {
+		ctn = append(ctn, fmt.Sprintf("\t%v", v))
+	}
+	return ctn
+}
+
+func extractStatus(line string) (string, string) {
+	work := string(line[1])
+	f := string(line[3:])
+	key := "Git-added"
+	if work == "?" {
+		key = "Untracked"
+	} else if work != " " {
+		key = "Not git-added"
+	}
+	return key, f
 }
