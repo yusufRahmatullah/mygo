@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	GitAdded  = "Git-added"
-	NotGit    = "Not git-added"
-	Untracked = "Untracked"
+	DefaultKnownPath = "known_gs.txt"
+	GitAdded         = "Git-added"
+	NotGit           = "Not git-added"
+	Untracked        = "Untracked"
 )
 
 type Git struct {
@@ -118,14 +119,19 @@ func fileExists(filepath string) bool {
 }
 
 func readKnownList(knownPath string) ([]string, error) {
+	var path string
 	if fileExists(knownPath) {
-		f, err := ioutil.ReadFile(knownPath)
-		if err != nil {
-			return nil, err
-		}
-		return strings.Split(string(f), "\n"), nil
+		path = knownPath
+	} else if fileExists(DefaultKnownPath) {
+		path = DefaultKnownPath
+	} else {
+		return []string{}, nil
 	}
-	return []string{}, nil
+	f, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(string(f), "\n"), nil
 }
 
 func stringInSlice(a string, list []string) bool {

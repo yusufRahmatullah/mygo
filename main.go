@@ -17,7 +17,7 @@ func main() {
 	gsCmd := parser.NewCommand("gs", "Simplified git status")
 	knownFile := gsCmd.String("k", "known-files", &argparse.Options{
 		Required: false,
-		Help:     "List of known files that will be excluded on list",
+		Help:     "List of known files that will be excluded on list. Default: 'kwnon_gs.txt'",
 	})
 	gpCmd := parser.NewCommand("gp", "Git push current branch")
 	err := parser.Parse(os.Args)
