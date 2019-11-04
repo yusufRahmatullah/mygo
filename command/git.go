@@ -1,4 +1,4 @@
-package git
+package command
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/urfave/cli"
 )
 
 const (
@@ -15,38 +17,93 @@ const (
 	Untracked        = "Untracked"
 )
 
-type Git struct {
+var (
+	knownFile string
+)
+
+type git struct {
+	branch    string
+	knownFile string
+	knownList []string
+	statusMap map[string][]string
 }
 
-func (git *Git) Branch() (string, error) {
-	return cmd("git rev-parse --abbrev-ref HEAD")
+func newGit(knownFile string) (*git, error) {
+	g := &git{knownFile: knownFile}
+	if err := g.readKnownList(); err != nil {
+		return nil, err
+	}
+	if err := g.getBranch(); err != nil {
+		return nil, err
+	}
+	if err := g.readStatusMap(); err != nil {
+		return nil, err
+	}
+	return g, nil
 }
 
-func (git *Git) Push() error {
-	_, err := cmd("git push origin HEAD")
-	return err
+func (g *git) getBranch() error {
+	if branch, err := cmd("git rev-parse --abbrev-ref HEAD"); err == nil {
+		g.branch = branch
+		return nil
+	} else {
+		return err
+	}
 }
 
-func (git *Git) Repo() (string, error) {
-	return cmd("git remote get-url origin")
-}
-
-func (git *Git) PrintStatus(knownPath string) error {
-	knownList, err := readKnownList(knownPath)
+func (g *git) readKnownList() error {
+	var path string
+	if fileExists(g.knownFile) {
+		path = g.knownFile
+	} else if fileExists(DefaultKnownPath) {
+		path = DefaultKnownPath
+	} else {
+		g.knownList = []string{}
+		return nil
+	}
+	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	branch, err := git.Branch()
+	g.knownList = strings.Split(string(f), "\n")
+	return nil
+}
+
+func (g *git) readStatusMap() error {
+	out, err := cmd("git status -s")
 	if err != nil {
 		return err
 	}
-	sm, err := git.Status(knownList)
+	g.statusMap = extractStatusMap(g.knownList, strings.Split(out, "\n"))
+	return nil
+}
+
+func AddGitStatusCommand() cli.Command {
+	gsc := cli.Command{
+		Name:   "gs",
+		Usage:  "Simplified git status",
+		Action: gitStatus,
+	}
+	gsc.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name: "known-files, k",
+
+			Value: "known_gs.txt",
+			Usage: "List of known files that will not be shown",
+		},
+	}
+	return gsc
+}
+
+func gitStatus(c *cli.Context) error {
+	knownFile := c.String("known-files")
+	g, err := newGit(knownFile)
 	if err != nil {
 		return err
 	}
-	ctn := []string{fmt.Sprintf("On Branch %v", branch)}
+	ctn := []string{fmt.Sprintf("On Branch %v", g.branch)}
 	for _, key := range []string{NotGit, GitAdded, Untracked} {
-		if v, ok := sm[key]; ok {
+		if v, ok := g.statusMap[key]; ok {
 			ctn = append(ctn, extendStatus(key, v)...)
 		}
 	}
@@ -54,13 +111,8 @@ func (git *Git) PrintStatus(knownPath string) error {
 	return nil
 }
 
-func (git *Git) Status(knownList []string) (map[string][]string, error) {
-	out, err := cmd("git status -s")
-	if err != nil {
-		return nil, err
-	}
+func extractStatusMap(knownList []string, lines []string) map[string][]string {
 	statusMap := make(map[string][]string)
-	lines := strings.Split(out, "\n")
 	for _, line := range lines {
 		if line == "" {
 			continue
@@ -76,7 +128,7 @@ func (git *Git) Status(knownList []string) (map[string][]string, error) {
 			statusMap[key] = []string{file}
 		}
 	}
-	return statusMap, nil
+	return statusMap
 }
 
 func cmd(command string) (string, error) {

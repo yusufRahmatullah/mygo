@@ -1,55 +1,29 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/akamensky/argparse"
-	"github.com/yusufRahmatullah/mygo/git"
+	"github.com/urfave/cli"
+	"github.com/yusufRahmatullah/mygo/command"
 )
 
-var (
-	g = &git.Git{}
+const (
+	version = "0.2.0"
 )
 
 func main() {
-	parser := argparse.NewParser("mygo", "Simple utility for daily tasks")
-	gsCmd := parser.NewCommand("gs", "Simplified git status")
-	knownFile := gsCmd.String("k", "known-files", &argparse.Options{
-		Required: false,
-		Help:     "List of known files that will be excluded on list. Default: 'kwnon_gs.txt'",
-	})
-	gpCmd := parser.NewCommand("gp", "Git push current branch")
-	err := parser.Parse(os.Args)
-	if err != nil {
-		print(parser.Usage(err))
-		return
+	app := cli.NewApp()
+	app.Name = "MyGo"
+	app.Usage = "Simple Utility for daily tasks"
+	app.Version = version
+	app.Commands = []cli.Command{
+		command.AddGitStatusCommand(),
+		command.AddGenCommand(),
+		command.AddCopyCommand(),
+		command.AddPasteCommand(),
 	}
-	if gsCmd.Happened() {
-		gs(*knownFile)
-	} else if gpCmd.Happened() {
-		gp()
-	} else {
-		print("Something went wrong")
-	}
-}
-
-func gp() {
-	err := g.Push()
-	handleErr(err)
-}
-
-func gs(knownPath string) {
-	err := g.PrintStatus(knownPath)
-	handleErr(err)
-}
-
-func handleErr(err error) {
+	err := app.Run(os.Args)
 	if err != nil {
 		panic(err)
 	}
-}
-
-func print(a ...interface{}) {
-	fmt.Println(a...)
 }
