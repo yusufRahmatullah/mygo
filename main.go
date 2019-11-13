@@ -21,6 +21,7 @@ func main() {
 		command.AddGenCommand(),
 		command.AddCopyCommand(),
 		command.AddPasteCommand(),
+		command.AddHrCommand(),
 	}
 	err := app.Run(os.Args)
 	if err != nil {
