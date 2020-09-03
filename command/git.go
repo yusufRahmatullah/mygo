@@ -86,10 +86,13 @@ func AddGitStatusCommand() cli.Command {
 	}
 	gsc.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name: "known-files, k",
-
+			Name:  "known-files, k",
 			Value: "known_gs.txt",
 			Usage: "List of known files that will not be shown",
+		},
+		cli.BoolFlag{
+			Name:  "short, s",
+			Usage: "Show file name only",
 		},
 	}
 	return gsc
@@ -97,14 +100,18 @@ func AddGitStatusCommand() cli.Command {
 
 func gitStatus(c *cli.Context) error {
 	knownFile := c.String("known-files")
+	short := c.Bool("short")
 	g, err := newGit(knownFile)
 	if err != nil {
 		return err
 	}
-	ctn := []string{fmt.Sprintf("On Branch %v", g.branch)}
+	var ctn []string
+	if !short {
+		ctn = []string{fmt.Sprintf("On Branch %v", g.branch)}
+	}
 	for _, key := range []string{NotGit, GitAdded, Untracked} {
 		if v, ok := g.statusMap[key]; ok {
-			ctn = append(ctn, extendStatus(key, v)...)
+			ctn = append(ctn, extendStatus(key, v, short)...)
 		}
 	}
 	fmt.Println(strings.Join(ctn, "\n"))
@@ -142,10 +149,17 @@ func cmd(command string) (string, error) {
 	return string(out), nil
 }
 
-func extendStatus(key string, value []string) []string {
-	ctn := []string{fmt.Sprintf("%v:", key)}
+func extendStatus(key string, value []string, short bool) []string {
+	var ctn []string
+	if !short {
+		ctn = []string{fmt.Sprintf("%v:", key)}
+	}
 	for _, v := range value {
-		ctn = append(ctn, fmt.Sprintf("\t%v", v))
+		if short {
+			ctn = append(ctn, fmt.Sprintf("%v", v))
+		} else {
+			ctn = append(ctn, fmt.Sprintf("\t%v", v))
+		}
 	}
 	return ctn
 }
