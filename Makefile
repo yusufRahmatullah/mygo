@@ -17,3 +17,7 @@ install-linux: compress
 install-windows: compress
 	mv -f myc /d/portable/gobin/my
 	ls -hl /d/portable/gobin/my
+install-py-windows:
+	cp mp.bat /d/portable/gobin/
+	cp my.py /d/portable/gobin/
+	cp my.py /d/portable/gobin/myp
