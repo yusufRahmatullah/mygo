@@ -1,0 +1,5 @@
+kubectl -n <service> get pods
+kubectl -n <service> get deployment
+kubectl -n <service> get hpa
+KUBE_EDITOR=nano kubectl -n <service> edit deployment
+kubectl -n <service> exec -it <pod> -- sh
