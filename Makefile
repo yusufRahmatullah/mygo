@@ -22,6 +22,8 @@ install-py-linux:
 	sed -n '1!p' my.py >> myp
 	chmod +x myp
 	sudo mv -f myp /usr/local/bin/myp
+	chmod +x kb.py
+	sudo cp -f kb.py /usr/local/bin/kb
 install-py-windows:
 	cp mp.bat /d/portable/gobin/
 	cp my.py /d/portable/gobin/
