@@ -18,10 +18,10 @@ install-windows: compress
 	mv -f myc /d/portable/gobin/my
 	ls -hl /d/portable/gobin/my
 install-py-linux:
-	echo "#!/usr/bin/python" > myp
-	sed -n '1!p' my.py >> myp
-	chmod +x myp
-	sudo mv -f myp /usr/local/bin/myp
+	echo "#!/usr/bin/python" > mp
+	sed -n '1!p' my.py >> mp
+	chmod +x mp
+	sudo mv -f mp /usr/local/bin/mp
 	chmod +x kb.py
 	sudo cp -f kb.py /usr/local/bin/kb
 install-py-windows:
