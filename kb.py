@@ -37,6 +37,7 @@ class KubeGrammar:
         if len(self.args) < 1:
             raise Exception(f'{self.cmd} require pod name')
         self.pod_name = self.args[0]
+        self.args = self.args[1:]
         if self.pod_name == self.service or self.pod_name in self.all_cmd:
             raise Exception(f'Invalid pod name: {self.pod_name}')
 
@@ -46,10 +47,12 @@ class KubeGrammar:
                 f'{self.cmd} require at least 1 more arguments'
             )
         self.sub_cmd = self.args[0]
+        self.args = self.args[1:]
         if self.sub_cmd not in self.pos_cmd:
             raise Exception(f'Invalid sub-command: {self.sub_cmd}')
-        if len(self.args) >= 2:
-            self.pod_name = self.args[1]
+        if len(self.args) >= 1:
+            self.pod_name = self.args[0]
+            self.args = self.args[1:]
 
     def _validate_service(self):
         if self.service in self.all_cmd:
@@ -68,6 +71,9 @@ class KubeProcessor:
         elif self.kg.cmd == 'exec':
             svc = self.kg.service
             pod = self.kg.pod_name
+            if pod == 'auto':
+                fpipe = "grep Running | head -1 | awk '{print $1}'"
+                pod = f'$(kubectl -n {svc} get pods | {fpipe})'
             cmd = f'kubectl -n {svc} exec -it {pod} -- sh'
         else:
             cmd = ''
@@ -86,6 +92,9 @@ class KubeProcessor:
 
     def _process_get(self):
         cmd = f'kubectl -n {self.kg.service} get {self.kg.cmd}'
+        if self.kg.args:
+            fkey = self.kg.args[0]
+            cmd = f'{cmd} | grep -Ei {fkey}'
         return cmd
 
 
