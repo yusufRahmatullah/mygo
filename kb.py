@@ -104,9 +104,12 @@ def parse_args():
 
 
 def process(args):
-    kg = KubeGrammar(args.keywords)
-    kp = KubeProcessor(kg)
-    kp.process()
+    try:
+        kg = KubeGrammar(args.keywords)
+        kp = KubeProcessor(kg)
+        kp.process()
+    except Exception as e:
+        print(e)
 
 
 def main():
