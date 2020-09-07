@@ -1,7 +1,6 @@
 #!/usr/bin/python
 from argparse import ArgumentParser
 import os
-import sys
 
 # Known kubectl commands
 KB_COMMANDS = ['pods', 'hpa', 'deployment', 'exec', 'edit']
@@ -50,7 +49,7 @@ class KubeGrammar:
         if self.sub_cmd not in self.pos_cmd:
             raise Exception(f'Invalid sub-command: {self.sub_cmd}')
         if len(self.args) >= 2:
-            self.pod_name = self.args[1] 
+            self.pod_name = self.args[1]
 
     def _validate_service(self):
         if self.service in self.all_cmd:

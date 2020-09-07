@@ -21,6 +21,7 @@ def _parse_gs(subparsers):
     )
     gs_subparsers = parser.add_subparsers(dest='subcmd')
     gs_subparsers.add_parser('add', help='Git add all changes')
+    gs_subparsers.add_parser('diff', help='Git diff all changes')
     gen_parser = gs_subparsers.add_parser(
         'gen', help=f'Generate {KNOWN_FILES} file'
     )
@@ -89,7 +90,7 @@ def _status_map():
             smap[key] = []
         smap[key].append(file)
     return smap
-        
+
 
 def _process_gs_add(args):
     smap = _status_map()
@@ -118,9 +119,18 @@ def _process_gs_gen(args):
         f.write(KNOWN_FILES)
 
 
+def _process_gs_diff(args):
+    smap = _status_map()
+    files = []
+    for values in smap.values():
+        files.extend(values)
+    os.system(f'git diff {" ".join(files)}')
+
+
 def process_gs(args):
     subcmd_map = {
         'add': _process_gs_add,
+        'diff': _process_gs_diff,
         'gen': _process_gs_gen
     }
     if args.subcmd:
