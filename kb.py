@@ -1,11 +1,93 @@
 #!/usr/bin/python
 from argparse import ArgumentParser
 import os
-import subprocess as sp
 import sys
 
 # Known kubectl commands
 KB_COMMANDS = ['pods', 'hpa', 'deployment', 'exec', 'edit']
+
+
+class KubeGrammar:
+    single_cmd = ['pods', 'hpa', 'cm', 'deployment']
+    pos_cmd = ['hpa', 'cm', 'deployment']
+    acc_cmd = ['describe', 'edit']
+    all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec']
+
+    def __init__(self, words):
+        if len(words) < 2:
+            raise Exception('Kube command should has at least 2 arguments')
+        self.words = words
+        self.service = words[0]
+        self.cmd = words[1]
+        self.args = words[2:]
+        self._validate()
+
+    def _validate(self):
+        self._validate_service()
+        self._validate_command()
+        if self.cmd in self.acc_cmd:
+            self._validate_pos_command()
+        if self.cmd == 'exec':
+            self._validate_exec()
+
+    def _validate_command(self):
+        if self.cmd not in self.all_cmd:
+            raise Exception(f'Invalid command: {self.cmd}')
+
+    def _validate_exec(self):
+        if len(self.args) < 1:
+            raise Exception(f'{self.cmd} require pod name')
+        self.pod_name = self.args[0]
+        if self.pod_name == self.service or self.pod_name in self.all_cmd:
+            raise Exception(f'Invalid pod name: {self.pod_name}')
+
+    def _validate_pos_command(self):
+        if len(self.args) < 1:
+            raise Exception(
+                f'{self.cmd} require at least 1 more arguments'
+            )
+        self.sub_cmd = self.args[0]
+        if self.sub_cmd not in self.pos_cmd:
+            raise Exception(f'Invalid sub-command: {self.sub_cmd}')
+        if len(self.args) >= 2:
+            self.pod_name = self.args[1] 
+
+    def _validate_service(self):
+        if self.service in self.all_cmd:
+            raise Exception(f'Invalid service name: {self.service}')
+
+
+class KubeProcessor:
+    def __init__(self, kg: KubeGrammar):
+        self.kg = kg
+
+    def process(self):
+        if self.kg.cmd in KubeGrammar.single_cmd:
+            cmd = self._process_get()
+        elif self.kg.cmd in KubeGrammar.acc_cmd:
+            cmd = self._process_acc()
+        elif self.kg.cmd == 'exec':
+            svc = self.kg.service
+            pod = self.kg.pod_name
+            cmd = f'kubectl -n {svc} exec -it {pod} -- sh'
+        else:
+            cmd = ''
+        os.system(cmd)
+
+    def _process_acc(self):
+        cmd = f'kubectl -n {self.kg.service} {self.kg.cmd} {self.kg.sub_cmd}'
+        if self.kg.cmd == 'edit':
+            cmd = f'KUBE_EDITOR=nano {cmd}'
+        try:
+            cmd = f'{cmd} {self.kg.pod_name}'
+        except AttributeError:
+            pass
+        finally:
+            return cmd
+
+    def _process_get(self):
+        cmd = f'kubectl -n {self.kg.service} get {self.kg.cmd}'
+        return cmd
 
 
 def parse_args():
@@ -21,98 +103,10 @@ def parse_args():
         exit(1)
 
 
-def _cmd(cmd):
-    res = sp.check_output(cmd, shell=True)
-    return res.decode('utf-8')
-
-
-def _extract_service_pod(another_keys):
-    if len(another_keys) > 2:
-        print(f'Multiple kubectl arguments: {" ".join(another_keys)}')
-        exit(1)
-    service = ''
-    pod = ''
-    k1, k2 = another_keys
-    if k1.count('-') > k2.count('-'):
-        pod = k1
-        service = k2
-    else:
-        pod = k2
-        service = k1
-    return service, pod
-
-
-def _validate_kb_cmd(cmd_keys):
-    if len(cmd_keys) > 2:
-        print(f'Commands too much')
-        exit(1)
-    if len(cmd_keys) == 2:
-        if 'edit' not in cmd_keys:
-            print(f'Multiple cmd keys: {" ".join(cmd_keys)}')
-            exit(1)
-        if 'edit' in cmd_keys and ['pods', 'exec'] in cmd_keys:
-            another_cmd = [x for x in cmd_keys if x != 'edit'][0]
-            print(f'Cannot edit {another_cmd}')
-            exit(1)
-        if len(set(cmd_keys)) == 1:
-            print(f'Duplicate command: {cmd_keys[0]}')
-            exit(1)
-    if len(cmd_keys) == 1 and 'edit' == cmd_keys[0]:
-        print('Cannot edit without another command')
-        exit(1)
-    if len(cmd_keys) == 0:
-        print(f'No kubectl command. Choice: {{{" ".join(KB_COMMANDS)}}}')
-        exit(1)
-
-
-def _process_kb_get(cmd, another_keys):
-    if len(another_keys) == 0:
-        print('No service found')
-        exit(1)
-    service = another_keys[0]
-    out = _cmd(f'kubectl -n {service} get {cmd}')
-    print(out)
-
-
-def _process_kb_edit(cmd, another_keys):
-    service, pod = _extract_service_pod(another_keys)
-    _cmd(
-        f'KUBE_EDITOR=nano kubectl -n {service} edit {cmd} {pod}'
-    )
-
-
-def _process_kb_exec(another_keys):
-    service, pod = _extract_service_pod(another_keys)
-    _cmd(
-        f'kubectl -n {service} exec -it {pod} -- sh'
-    )
-
-
-def _process_kb_cmd(cmd_keys, another_keys):
-    if len(cmd_keys) == 1:
-        cmd = cmd_keys[0]
-        if cmd == 'exec':
-            _process_kb_exec(another_keys)
-            return
-        if len(another_keys) > 1:
-            print(f'Multiple service detected: {" ".join(another_keys)}')
-            exit(1)
-        _process_kb_get(cmd, another_keys)
-    else:
-        cmd = [x for x in cmd_keys if x != 'edit'][0]
-        _process_kb_edit(cmd, another_keys)
-
-
 def process(args):
-    cmd_keys = []
-    another_keys = []
-    for key in args.keywords:
-        if key in KB_COMMANDS:
-            cmd_keys.append(key)
-        else:
-            another_keys.append(key)
-    _validate_kb_cmd(cmd_keys)
-    _process_kb_cmd(cmd_keys, another_keys)
+    kg = KubeGrammar(args.keywords)
+    kp = KubeProcessor(kg)
+    kp.process()
 
 
 def main():
