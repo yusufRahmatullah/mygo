@@ -7,8 +7,8 @@ KB_COMMANDS = ['pods', 'hpa', 'deployment', 'exec', 'edit']
 
 
 class KubeGrammar:
-    single_cmd = ['pods', 'hpa', 'cm', 'deployment']
-    pos_cmd = ['hpa', 'cm', 'deployment']
+    single_cmd = ['pods', 'hpa', 'cm', 'deployment', 'ingress']
+    pos_cmd = ['hpa', 'cm', 'deployment', 'ingress']
     acc_cmd = ['describe', 'edit']
     all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec']
 
@@ -72,7 +72,7 @@ class KubeProcessor:
             svc = self.kg.service
             pod = self.kg.pod_name
             if pod == 'auto':
-                fpipe = "grep Running | head -1 | awk '{print $1}'"
+                fpipe = "grep -Ei Running | head -1 | awk '{print $1}'"
                 pod = f'$(kubectl -n {svc} get pods | {fpipe})'
             cmd = f'kubectl -n {svc} exec -it {pod} -- sh'
         else:
