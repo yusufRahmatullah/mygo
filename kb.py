@@ -10,7 +10,7 @@ class KubeGrammar:
     single_cmd = ['pods', 'hpa', 'cm', 'deployment', 'ingress']
     pos_cmd = ['hpa', 'cm', 'deployment', 'ingress']
     acc_cmd = ['describe', 'edit']
-    all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec']
+    all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec', 'restart']
 
     def __init__(self, words):
         if len(words) < 2:
@@ -26,8 +26,10 @@ class KubeGrammar:
         self._validate_command()
         if self.cmd in self.acc_cmd:
             self._validate_pos_command()
-        if self.cmd == 'exec':
+        elif self.cmd == 'exec':
             self._validate_exec()
+        elif self.cmd == 'restart':
+            self._validate_restart()
 
     def _validate_command(self):
         if self.cmd not in self.all_cmd:
@@ -54,6 +56,15 @@ class KubeGrammar:
             self.pod_name = self.args[0]
             self.args = self.args[1:]
 
+    def _validate_restart(self):
+        if len(self.args) < 1:
+            raise Exception(
+                f'{self.cmd} require at least 1 more arguments'
+            )
+        if len(self.args) >= 1:
+            self.pod_name = self.args[0]
+            self.args = self.args[1:]
+
     def _validate_service(self):
         if self.service in self.all_cmd:
             raise Exception(f'Invalid service name: {self.service}')
@@ -72,9 +83,14 @@ class KubeProcessor:
             svc = self.kg.service
             pod = self.kg.pod_name
             if pod == 'auto':
-                fpipe = "grep -Ei Running | head -1 | awk '{print $1}'"
+                fpipe = (
+                    "grep -Ei Running | grep -Eiv background | "
+                    "head -1 | awk '{print $1}'"
+                )
                 pod = f'$(kubectl -n {svc} get pods | {fpipe})'
             cmd = f'kubectl -n {svc} exec -it {pod} -- sh'
+        elif self.kg.cmd == 'restart':
+            cmd = self._process_restart()
         else:
             cmd = ''
         os.system(cmd)
@@ -95,6 +111,13 @@ class KubeProcessor:
         if self.kg.args:
             fkey = self.kg.args[0]
             cmd = f'{cmd} | grep -Ei {fkey}'
+        return cmd
+
+    def _process_restart(self):
+        cmd = (
+            f'kubectl -n {self.kg.service} rollout restart '
+            f'deployment/{self.kg.pod_name}'
+        )
         return cmd
 
 
