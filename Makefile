@@ -30,6 +30,8 @@ install-py-linux: check-py
 	sudo mv -f mp /usr/local/bin/mp
 	chmod +x kb.py
 	sudo cp -f kb.py /usr/local/bin/kb
+	chmod +x asn.py
+	sudo cp -f asn.py /usr/local/bin/asn
 install-py-windows:
 	cp mp.bat /d/portable/gobin/
 	cp my.py /d/portable/gobin/

@@ -7,8 +7,8 @@ KB_COMMANDS = ['pods', 'hpa', 'deployment', 'exec', 'edit']
 
 
 class KubeGrammar:
-    single_cmd = ['pods', 'hpa', 'cm', 'deployment', 'ingress']
-    pos_cmd = ['hpa', 'cm', 'deployment', 'ingress']
+    single_cmd = ['pods', 'hpa', 'cm', 'deployment', 'ingress', 'rq']
+    pos_cmd = ['hpa', 'cm', 'deployment', 'ingress', 'rq']
     acc_cmd = ['describe', 'edit']
     all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec', 'restart']
 
@@ -96,6 +96,8 @@ class KubeProcessor:
         os.system(cmd)
 
     def _process_acc(self):
+        if self.kg.sub_cmd == 'rq':
+            self.kg.sub_cmd = 'resourcequota'
         cmd = f'kubectl -n {self.kg.service} {self.kg.cmd} {self.kg.sub_cmd}'
         if self.kg.cmd == 'edit':
             cmd = f'KUBE_EDITOR=nano {cmd}'
@@ -107,6 +109,8 @@ class KubeProcessor:
             return cmd
 
     def _process_get(self):
+        if self.kg.cmd == 'rq':
+            self.kg.cmd = 'resourcequota'
         cmd = f'kubectl -n {self.kg.service} get {self.kg.cmd}'
         if self.kg.args:
             fkey = self.kg.args[0]
