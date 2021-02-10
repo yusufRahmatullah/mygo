@@ -10,7 +10,7 @@ class KubeGrammar:
     single_cmd = ['pods', 'hpa', 'cm', 'deployment', 'ingress', 'rq']
     pos_cmd = ['hpa', 'cm', 'deployment', 'ingress', 'rq']
     acc_cmd = ['describe', 'edit']
-    all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec', 'restart']
+    all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec', 'restart', 'pf']
 
     def __init__(self, words):
         if len(words) < 2:
@@ -30,6 +30,8 @@ class KubeGrammar:
             self._validate_exec()
         elif self.cmd == 'restart':
             self._validate_restart()
+        elif self.cmd == 'pf':
+            self._validate_pos_command()
 
     def _validate_command(self):
         if self.cmd not in self.all_cmd:
@@ -50,7 +52,9 @@ class KubeGrammar:
             )
         self.sub_cmd = self.args[0]
         self.args = self.args[1:]
-        if self.sub_cmd not in self.pos_cmd:
+        if self.cmd == 'pf':
+            pass
+        elif self.sub_cmd not in self.pos_cmd:
             raise Exception(f'Invalid sub-command: {self.sub_cmd}')
         if len(self.args) >= 1:
             self.pod_name = self.args[0]
@@ -79,6 +83,20 @@ class KubeProcessor:
             cmd = self._process_get()
         elif self.kg.cmd in KubeGrammar.acc_cmd:
             cmd = self._process_acc()
+        elif self.kg.cmd == 'pf':
+            svc = self.kg.service
+            pod = self.kg.pod_name
+            port = int(self.kg.sub_cmd)
+            if pod == 'auto':
+                fpipe = (
+                    "grep -Ei Running | grep -Eiv background | "
+                    "head -1 | awk '{print $1}'"
+                )
+                pod = f'$(kubectl -n {svc} get pods | {fpipe})'
+            cmd = f'kubectl -n {svc} port-forward {pod} {port}:{port}'
+            print('\n============================================')
+            print('Port Forwarding. Ensure to use right context')
+            print('============================================\n')
         elif self.kg.cmd == 'exec':
             svc = self.kg.service
             pod = self.kg.pod_name
