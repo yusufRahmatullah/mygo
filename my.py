@@ -9,8 +9,6 @@ KNOWN_FILES = 'known_gs.txt'
 GIT_ADDED = 'Git-added'
 NOT_ADDED = 'Not git-added'
 UNTRACKED = 'Untracked'
-# Known kubectl commands
-KB_COMMANDS = ['pods', 'hpa', 'deployment', 'exec', 'edit']
 
 
 def _parse_gs(subparsers):
@@ -102,6 +100,9 @@ def _process_gs_add(args):
 
 
 def _process_gs_gen_add(args):
+    if not os.path.exists(KNOWN_FILES):
+        with open(KNOWN_FILES, 'w') as f:
+            f.write(f'{KNOWN_FILES}')
     with open(KNOWN_FILES, 'a') as f:
         f.write(f'\n{args.file}')
 
