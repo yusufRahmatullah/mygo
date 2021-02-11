@@ -2,145 +2,199 @@
 from argparse import ArgumentParser
 import os
 
+# kubectl prefix
+KB_PREFIX = 'kubectl -n'
+
 # Known kubectl commands
-KB_COMMANDS = ['pods', 'hpa', 'deployment', 'exec', 'edit']
+KB_ALIAS = {
+    'rq': 'resourcequota'
+}
+KB_COMMANDS = [
+    'cm', 'deployment', 'hpa', 'ingress', 'pods', 'rq',
+    'describe', 'edit',
+    'exec', 'pf', 'restart',
+]
+KB_SUB_COMMANDS = ['cm', 'deployment', 'hpa', 'ingress', 'rq']
 
 
-class KubeGrammar:
-    single_cmd = ['pods', 'hpa', 'cm', 'deployment', 'ingress', 'rq']
-    pos_cmd = ['hpa', 'cm', 'deployment', 'ingress', 'rq']
-    acc_cmd = ['describe', 'edit']
-    all_cmd = single_cmd + pos_cmd + acc_cmd + ['exec', 'restart', 'pf']
-
-    def __init__(self, words):
-        if len(words) < 2:
-            raise Exception('Kube command should has at least 2 arguments')
-        self.words = words
-        self.service = words[0]
-        self.cmd = words[1]
-        self.args = words[2:]
-        self._validate()
-
-    def _validate(self):
+class BaseCmd:
+    def __init__(self, keywords: list):
+        self._parse_token(keywords)
         self._validate_service()
         self._validate_command()
-        if self.cmd in self.acc_cmd:
-            self._validate_pos_command()
-        elif self.cmd == 'exec':
-            self._validate_exec()
-        elif self.cmd == 'restart':
-            self._validate_restart()
-        elif self.cmd == 'pf':
-            self._validate_pos_command()
+        self._parse_alias()
+        self.validate()
+        self.parse_options()
+        self.validate_options()
+
+    def _parse_alias(self):
+        self.cmd = KB_ALIAS.get(self.cmd, self.cmd)
+
+    def _parse_token(self, keywords: list):
+        self.service = keywords[0]
+        self.cmd = keywords[1]
+        self.args = keywords[2:]
 
     def _validate_command(self):
-        if self.cmd not in self.all_cmd:
+        if self.cmd not in KB_COMMANDS:
             raise Exception(f'Invalid command: {self.cmd}')
 
-    def _validate_exec(self):
-        if len(self.args) < 1:
-            raise Exception(f'{self.cmd} require pod name')
-        self.pod_name = self.args[0]
-        self.args = self.args[1:]
-        if self.pod_name == self.service or self.pod_name in self.all_cmd:
-            raise Exception(f'Invalid pod name: {self.pod_name}')
-
-    def _validate_pos_command(self):
-        if len(self.args) < 1:
-            raise Exception(
-                f'{self.cmd} require at least 1 more arguments'
-            )
-        self.sub_cmd = self.args[0]
-        self.args = self.args[1:]
-        if self.cmd == 'pf':
-            pass
-        elif self.sub_cmd not in self.pos_cmd:
-            raise Exception(f'Invalid sub-command: {self.sub_cmd}')
-        if len(self.args) >= 1:
-            self.pod_name = self.args[0]
-            self.args = self.args[1:]
-
-    def _validate_restart(self):
-        if len(self.args) < 1:
-            raise Exception(
-                f'{self.cmd} require at least 1 more arguments'
-            )
-        if len(self.args) >= 1:
-            self.pod_name = self.args[0]
-            self.args = self.args[1:]
-
     def _validate_service(self):
-        if self.service in self.all_cmd:
+        if self.service in KB_COMMANDS:
             raise Exception(f'Invalid service name: {self.service}')
 
-
-class KubeProcessor:
-    def __init__(self, kg: KubeGrammar):
-        self.kg = kg
+    def parse_options(self):
+        pass
 
     def process(self):
-        if self.kg.cmd in KubeGrammar.single_cmd:
-            cmd = self._process_get()
-        elif self.kg.cmd in KubeGrammar.acc_cmd:
-            cmd = self._process_acc()
-        elif self.kg.cmd == 'pf':
-            svc = self.kg.service
-            pod = self.kg.pod_name
-            port = int(self.kg.sub_cmd)
-            if pod == 'auto':
-                fpipe = (
-                    "grep -Ei Running | grep -Eiv background | "
-                    "head -1 | awk '{print $1}'"
-                )
-                pod = f'$(kubectl -n {svc} get pods | {fpipe})'
-            cmd = f'kubectl -n {svc} port-forward {pod} {port}:{port}'
-            print('\n============================================')
-            print('Port Forwarding. Ensure to use right context')
-            print('============================================\n')
-        elif self.kg.cmd == 'exec':
-            svc = self.kg.service
-            pod = self.kg.pod_name
-            if pod == 'auto':
-                fpipe = (
-                    "grep -Ei Running | grep -Eiv background | "
-                    "head -1 | awk '{print $1}'"
-                )
-                pod = f'$(kubectl -n {svc} get pods | {fpipe})'
-            cmd = f'kubectl -n {svc} exec -it {pod} -- sh'
-        elif self.kg.cmd == 'restart':
-            cmd = self._process_restart()
-        else:
-            cmd = ''
-        os.system(cmd)
+        print('process not implemented in', self.cmd)
+        raise NotImplementedError
 
-    def _process_acc(self):
-        if self.kg.sub_cmd == 'rq':
-            self.kg.sub_cmd = 'resourcequota'
-        cmd = f'kubectl -n {self.kg.service} {self.kg.cmd} {self.kg.sub_cmd}'
-        if self.kg.cmd == 'edit':
-            cmd = f'KUBE_EDITOR=nano {cmd}'
-        try:
-            cmd = f'{cmd} {self.kg.pod_name}'
-        except AttributeError:
-            pass
-        finally:
-            return cmd
+    def validate(self):
+        print('validate not implemented in', self.cmd)
+        raise NotImplementedError
 
-    def _process_get(self):
-        if self.kg.cmd == 'rq':
-            self.kg.cmd = 'resourcequota'
-        cmd = f'kubectl -n {self.kg.service} get {self.kg.cmd}'
-        if self.kg.args:
-            fkey = self.kg.args[0]
-            cmd = f'{cmd} | grep -Ei {fkey}'
+    def validate_options(self):
+        pass
+
+
+class ExecCmd(BaseCmd):
+    def parse_options(self):
+        self.pod_name = self.args[0]
+        self.args = self.args[1:]
+
+    def process(self):
+        svc = self.service
+        pod = self.pod_name
+        if pod == 'auto':
+            fpipe = (
+                "grep -Ei Running | grep -Eiv background | "
+                "head -1 | awk '{print $1}'"
+            )
+            pod = f'$(kubectl -n {svc} get pods | {fpipe})'
+        return f'kubectl -n {svc} exec -it {pod} -- sh'
+
+    def validate(self):
+        if len(self.args) < 1:
+            raise Exception(f'{self.cmd} require pod name')
+
+    def validate_options(self):
+        if self.pod_name == self.service or self.pod_name in KB_COMMANDS:
+            raise Exception(f'Invalid pod name: {self.pod_name}')
+
+
+class GetCmd(BaseCmd):
+    def process(self):
+        pod_name = self.args[0] if self.args else ''
+        cmd = f'{KB_PREFIX} {self.service} get {self.cmd}'
+        if pod_name:
+            cmd = f'{cmd} | grep -Ei {pod_name}'
         return cmd
 
-    def _process_restart(self):
+    def validate(self):
+        pass
+
+
+class HasSubCmd(BaseCmd):
+    def parse_options(self):
+        self.sub_cmd = self.args[0]
+        self.args = self.args[1:]
+        if len(self.args) >= 1:
+            self.pod_name = self.args[0]
+            self.args = self.args[1:]
+
+    def process(self):
+        self.sub_cmd = KB_ALIAS.get(self.sub_cmd, self.sub_cmd)
+        cmd = f'{KB_PREFIX} {self.service} {self.cmd} {self.sub_cmd}'
+        if hasattr(self, 'pod_name'):
+            cmd = f'{cmd} {self.pod_name}'
+        return cmd
+
+    def validate(self):
+        if len(self.args) < 1:
+            raise Exception(f'{self.cmd} require at least 1 more arguments')
+
+    def validate_options(self):
+        if self.sub_cmd not in KB_SUB_COMMANDS:
+            raise Exception(f'Invalid sub-command: {self.sub_cmd}')
+
+
+class RestartCmd(BaseCmd):
+    def parse_options(self):
+        if len(self.args) >= 1:
+            self.pod_name = self.args[0]
+            self.args = self.args[1:]
+
+    def process(self):
         cmd = (
-            f'kubectl -n {self.kg.service} rollout restart '
-            f'deployment/{self.kg.pod_name}'
+            f'kubectl -n {self.service} rollout restart '
+            f'deployment/{self.pod_name}'
         )
         return cmd
+
+    def validate(self):
+        if len(self.args) < 1:
+            raise Exception(
+                f'{self.cmd} require at least 1 more arguments'
+            )
+
+
+class PortForwardCmd(BaseCmd):
+    def parse_options(self):
+        self.sub_cmd = self.args[0]
+        self.args = self.args[1:]
+        if len(self.args) >= 1:
+            self.pod_name = self.args[0]
+            self.args = self.args[1:]
+
+    def process(self):
+        svc = self.service
+        pod = self.pod_name
+        port = int(self.sub_cmd)
+        if pod == 'auto':
+            fpipe = (
+                "grep -Ei Running | grep -Eiv background | "
+                "head -1 | awk '{print $1}'"
+            )
+            pod = f'$(kubectl -n {svc} get pods | {fpipe})'
+        print('\n============================================')
+        print('Port Forwarding. Ensure to use right context')
+        print('============================================\n')
+        return f'kubectl -n {svc} port-forward {pod} {port}:{port}'
+
+    def validate(self):
+        if len(self.args) < 1:
+            raise Exception(
+                f'{self.cmd} require at least 1 more arguments'
+            )
+
+
+class EditCmd(HasSubCmd):
+    def process(self):
+        cmd = super().process()
+        return f'KUBE_EDITOR=nano {cmd}'
+
+
+class CmdFactory:
+    _cmd_map = {
+        'cm': GetCmd,
+        'deployment': GetCmd,
+        'hpa': GetCmd,
+        'ingress': GetCmd,
+        'pods': GetCmd,
+        'rq': GetCmd,
+        'describe': HasSubCmd,
+        'edit': EditCmd,
+        'exec': ExecCmd,
+        'restart': RestartCmd,
+        'pf': PortForwardCmd,
+    }
+
+    @classmethod
+    def get_cmd(cls, keywords: str):
+        cmd = keywords[1]
+        cmd_cls = cls._cmd_map.get(cmd, BaseCmd)
+        return cmd_cls(keywords)
 
 
 def parse_args():
@@ -157,12 +211,10 @@ def parse_args():
 
 
 def process(args):
-    try:
-        kg = KubeGrammar(args.keywords)
-        kp = KubeProcessor(kg)
-        kp.process()
-    except Exception as e:
-        print(e)
+    cmd_cls: BaseCmd
+    cmd_cls = CmdFactory.get_cmd(args.keywords)
+    cmd = cmd_cls.process()
+    os.system(cmd)
 
 
 def main():

@@ -5,7 +5,7 @@ check: dep-test
 check-py: format-py
 	radon cc --min C *.py
 	radon mi --min B *.py
-	flake8 *.py
+	flake8 *.py --exclude=test_*.py
 clean:
 	go clean
 	rm -f myc
@@ -23,7 +23,7 @@ install-linux: compress
 install-windows: compress
 	mv -f myc /d/portable/gobin/my
 	ls -hl /d/portable/gobin/my
-install-py-linux: check-py
+install-py-linux: test-py
 	echo "#!/usr/bin/python" > mp
 	sed -n '1!p' my.py >> mp
 	chmod +x mp
@@ -36,3 +36,5 @@ install-py-windows:
 	cp mp.bat /d/portable/gobin/
 	cp my.py /d/portable/gobin/
 	cp my.py /d/portable/gobin/myp
+test-py: check-py
+	python test_kb.py
